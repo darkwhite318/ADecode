@@ -5,6 +5,7 @@
 #include <sstream>
 #include <memory.h>
 #include <cmath>
+#include <time.h>
 
 using namespace std;
 # define SSIZE 37
@@ -14,16 +15,16 @@ double Encode[SSIZE][SSIZE];
 void file2Table(char*,double(&table)[SSIZE][SSIZE]);
 int w2n(int);
 char n2w(int);
-void updPath(char,double(&score)[SSIZE],int(&path)[SSIZE]);
+bool updPath(char,double(&score)[SSIZE],int(&path)[SSIZE]);
 
 int main(int argc, char* argv[]){
-
+    clock_t ckt;
+    ckt = clock();
     //set up 2 lookup table bigram and encode
     file2Table(argv[1],Bigram);
     file2Table(argv[2],Encode);
 
     //read in test.txt
-
     ifstream textFile;
     textFile.open(argv[3]);
     stringstream buffer;
@@ -31,12 +32,6 @@ int main(int argc, char* argv[]){
     string text = buffer.str();
     int textL = text.length();
 
-    string tempText="";
-    for (int i=0;i<textL;i++){
-       if(text[i]>=20)
-          tempText = tempText+text[i];
-    }
-    text = tempText;
     textL = text.length();
    
     //calculate the optimal path
@@ -51,10 +46,10 @@ int main(int argc, char* argv[]){
        score[i] = 0;
        optPath[textL-1][i] = 0;
     }
-
-   for(int i = textL-2;i>=0;i--){
+   bool notValid[textL];
+   for(int i = textL-1;i>=0;i--){
       int temp[SSIZE];
-      updPath(text[i],score,temp);
+      notValid[i] = updPath(text[i],score,temp);
       for(int j = 0;j<SSIZE;j++){
           optPath[i][j] = temp[j];
       }
@@ -69,19 +64,31 @@ int main(int argc, char* argv[]){
       }
    }
    ofstream outFile;
-   outFile.open(argv[4]);
-
-   outFile<<n2w(bestPath);
+   string textOut = text;
+   char fileLoc[40];
+   strcpy(fileLoc,"../");
+   strcat(fileLoc,argv[4]);  
+   outFile.open(fileLoc);
+   //outFile<<n2w(bestPath);
+   textOut[0] = n2w(bestPath);
    int t=0;
    
    while(t<text.length()-1){
       bestPath = optPath[t][bestPath]; 
-      outFile<<n2w(bestPath);
+      if(notValid[t+1]){
+        //outFile<<text[t+1];
+        textOut[t+1] = text[t+1];
+        t++;
+        continue;
+      }
+      //outFile<<n2w(bestPath);
+      textOut[t+1] = n2w(bestPath);
       t++;
    }
-
+   outFile<<textOut;
    outFile.close();
-
+   ckt = clock()-ckt;
+   cout<<"Used time:"<<((float)ckt/CLOCKS_PER_SEC)<<"s"<<endl;
     
 return 0;
 }
@@ -115,12 +122,14 @@ void file2Table(char* fileName, double (&table)[SSIZE][SSIZE]){
 
 //covert alphabet,number or SPACE to table index
 int w2n(int idx){
-	if(idx <0) // SPACE, ASCII = 20
+	if(idx == -16) // SPACE, ASCII = 32
 	    return SSIZE-1;
-	else if(idx>10) // a-z  ASCII = 97-122
+	else if(idx>=49 && idx<75) // a-z  ASCII = 97-122
 	    return idx-int('a'-'0')+10;
-	else // 0-9 ASCII = 48-57
+	else if(idx >=0 && idx<10) // 0-9 ASCII = 48-57
 	    return idx; 
+        else 
+  	    return -1;
 			   
 }
 
@@ -134,8 +143,14 @@ char n2w(int idx){
 }
 
 //update optpath and score
-void updPath(char ch, double (&score)[SSIZE] ,int (&path)[SSIZE]){
+bool updPath(char ch, double (&score)[SSIZE] ,int (&path)[SSIZE]){
    int idx = w2n(ch-'0');
+   bool ck = false;
+   if(idx<0){
+      idx = SSIZE-1;
+      ck = true;
+   }
+
    double newScore[SSIZE];
    double nowScore;
    int optLastCh;
@@ -160,4 +175,5 @@ void updPath(char ch, double (&score)[SSIZE] ,int (&path)[SSIZE]){
       score[i] = newScore[i];
    }
    //return path;
+   return ck;
 }
